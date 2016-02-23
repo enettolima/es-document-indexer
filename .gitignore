@@ -1,0 +1,4 @@
+.vagrant
+.*.swp
+oradiag_www-data/*
+html/*
