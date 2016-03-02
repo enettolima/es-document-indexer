@@ -47,7 +47,7 @@ class CronIndexDocuments extends Command
   {
     //Functions for test purposes only
     //$this->testElasticSearchConnection();
-    //$this->clearMysqlTables();
+    $this->clearMysqlTables();
     ////////////////////////////////
 
     //Call the function to start the folder creation on ES
@@ -104,7 +104,7 @@ class CronIndexDocuments extends Command
           $this->listFolderFiles($fileInfo->getPathname());
         }else{
           $this->info('File: '.$fileInfo->getFilename());
-          $this->checkFileExtension($dir.'/'.$fileInfo->getFilename(), $fileInfo->getFilename(), $folderName['parent']);
+          $this->checkFileExtension($dir.'/'.$fileInfo->getFilename(), $fileInfo->getFilename(), $dir);
         }
         $children = true;
       }else{
@@ -195,6 +195,7 @@ class CronIndexDocuments extends Command
     $m = count($ext_arr)-1;
     $valid = false;
 
+    $last_update = date ("Y-m-d H:i:s.", filemtime($filename));
     $extension = $ext_arr[$m];
     switch ($extension) {
       case 'pdf':
@@ -232,19 +233,25 @@ class CronIndexDocuments extends Command
     }
 
     if($valid){
+      $index_time = date("Y-m-d H:i:s");
+
       //Create object on mysql table
       $file               = new File;
       $file->name         = $name;
       $file->path         = $filename;
       $file->extension    = $extension;
+      $file->updated_at   = $index_time;
+      $file->last_file_change = $last_update;
       // save the folder to the database
       $file_db            = $file->save();
+      //Creating the array for elasticsearch
       $body['name']       = $name;
       $body['parent']     = $parent;
       $body['full_path']  = $filename;
       $body['extension']  = $extension;
-      //$body['content']    = str_replace("\n","",$content);
-      $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);//preg_replace('/[^A-Za-z0-9\-]/', '', $content);
+      $body['updated_at'] = $last_update;
+      $body['index_stamp']= $index_time;
+      $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);
 
       $this->info('Mysql ID for file '.$body['name'].' -> '.$file->id);
 
