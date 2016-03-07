@@ -1,4 +1,4 @@
-﻿Hello
+Hello
 
 I’m Casey Baumer
 123 ADDRESS ST
@@ -29,3 +29,5 @@ Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh 
 Awards
 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 Aenean ac interdum nisi.
+
+Last line updated

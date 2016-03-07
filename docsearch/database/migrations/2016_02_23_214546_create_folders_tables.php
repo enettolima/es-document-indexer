@@ -18,6 +18,7 @@ class CreateFoldersTables extends Migration
           $table->string('parent', 200);
           $table->string('full_path', 200);
           $table->boolean('children');
+          $table->boolean('found');
           $table->timestamps();
       });
     }

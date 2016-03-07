@@ -18,6 +18,7 @@ class CreateFileTable extends Migration
           $table->string('path', 200);
           $table->string('extension');
           $table->timestamp('last_file_change')->nullable();
+          $table->boolean('found');
           $table->timestamps();
       });
     }
