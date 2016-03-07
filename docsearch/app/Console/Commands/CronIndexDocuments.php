@@ -83,9 +83,9 @@ class CronIndexDocuments extends Command
     $this->compareCacheFolders();
 
     //Remove files/folders that hasn't been found
-    if ($this->confirm('Do you wish to remove missing files? [y|N]')) {
+    //if ($this->confirm('Do you wish to remove missing files? [y|N]')) {
       $this->removeMissingFiles();
-    }
+    //}
   }
   /*
    * This function will loop through the directories and get all the folders and files
@@ -212,26 +212,36 @@ class CronIndexDocuments extends Command
     $ext_arr = explode(".",$filename);
     $m = count($ext_arr)-1;
     $valid = false;
-
+    $index_time = date("Y-m-d H:i:s");
     $last_update = date ("Y-m-d H:i:s", filemtime($filename));
 
     //Checking if the file has been changed since last time
-    $newfile  = true;
-    $fileid   = 0;
+    $new_file     = true;
+    $file_id      = 0;
+    $is_different = true;
     $f = File::where('name', '=', $name)->where('path', '=', $filename)->get();
     if(count($f) > 0){
-      $fileid   = $f[0]['id'];
+      $file_id   = $f[0]['id'];
       $this->info('File '.$name.' last update => '.$last_update.' - db last update '.$f[0]['last_file_change']);
       if($f[0]['last_file_change'] != $last_update){
         $this->info('Different');
+        //Updating files
+        $SQL = "UPDATE files SET updated_at = '$index_time',
+        last_file_change = '$last_update',
+        found = '1' WHERE id = '$file_id'";
+        $update = DB::connection('mysql')->update($SQL);
+        Log::info("Update Query -> ".$SQL." with result ".$update);
       }else{
-        $newfile  = false;
+        $is_different  = false;
+        $new_file      = false;
+        $SQL = "UPDATE files SET found = '1' WHERE id = '$file_id'";
+        $update = DB::connection('mysql')->update($SQL);
         $this->info('Is the same');
       }
     }
     //If the date on the file has been changed, than re-index that file
-    if($newfile){
-      $extension = $ext_arr[$m];
+    $extension = $ext_arr[$m];
+    if($is_different){
       switch ($extension) {
         case 'pdf':
           $valid = true;
@@ -243,80 +253,69 @@ class CronIndexDocuments extends Command
           //Log::info('Text from file '.$fileInfo->getFilename().':'.$output);
           break;
         case 'doc':
-          $content = $this->readDocFile($filename);
           $valid = true;
+          $content = $this->readDocFile($filename);
           break;
         case 'docx':
-          $content = $this->readDocxFile($filename);
           $valid = true;
+          $content = $this->readDocxFile($filename);
           break;
         case 'txt':
+          $valid = true;
           $handle = fopen($filename, "rb");
           $content = fread($handle, filesize($filename));
           fclose($handle);
-          $valid = true;
           break;
         case 'csv':
+          $valid = true;
           $handle = fopen($filename, "rb");
           $content = fread($handle, filesize($filename));
           fclose($handle);
-          $valid = true;
           break;
         default:
           # code...
           break;
       }
+    }
 
-      if($valid){
-        $index_time = date("Y-m-d H:i:s");
-        if($fileid>0){
-          $file_db = $fileid;
-          //Updating files
-          $SQL = "UPDATE files SET updated_at = '$index_time',
-          last_file_change = '$last_update',
-          found = '1'
-          WHERE
-          id = $file_db";
-
-          DB::connection('mysql')->update($SQL);
-        }else{
-          //Create object on mysql table
-          $file                   = new File;
-          $file->name             = $name;
-          $file->path             = $filename;
-          $file->extension        = $extension;
-          $file->updated_at       = $index_time;
-          $file->last_file_change = $last_update;
-          $file->found            = 1;
-          // save the folder to the database
-          $file_db                = $file->save();
-        }
-
-        //Creating the array for elasticsearch
-        $body['name']       = $name;
-        $body['parent']     = $parent;
-        $body['full_path']  = $filename;
-        $body['extension']  = $extension;
-        $body['updated_at'] = $last_update;
-        $body['index_stamp']= $index_time;
-        $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);
-
-        $this->info('Mysql ID for file '.$body['name'].' -> '.$file->id);
-
-        $params = [
-            'index' => 'docsearch',
-            'type' => 'files',
-            'id'  => $file->id,
-            'body' => $body
-        ];
-
-        $hosts = [$_ENV['ES_HOST']];// IP + Port
-        // Instantiate a new ClientBuilder
-        $client = \Elasticsearch\ClientBuilder::create()
-          ->setHosts($hosts)      // Set the hosts
-          ->build();
-        $results = $client->index($params);
+    if($valid){
+      if($file_id<1){
+        //Create object on mysql table
+        $file                   = new File;
+        $file->name             = $name;
+        $file->path             = $filename;
+        $file->extension        = $extension;
+        $file->updated_at       = $index_time;
+        $file->last_file_change = $last_update;
+        $file->found            = 1;
+        // save the folder to the database
+        $file_db                = $file->save();
+        $file_id                = $file->id;
       }
+      //Creating the array for elasticsearch
+      $body['name']       = $name;
+      $body['parent']     = $parent;
+      $body['full_path']  = $filename;
+      $body['extension']  = $extension;
+      $body['updated_at'] = $last_update;
+      $body['index_stamp']= $index_time;
+      $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);
+
+      $this->info('Mysql ID for file '.$body['name'].' -> '.$file_id);
+
+      $params = [
+          'index' => 'docsearch',
+          'type' => 'files',
+          'id'  => $file_id,
+          'body' => $body
+      ];
+
+      $hosts = [$_ENV['ES_HOST']];// IP + Port
+      // Instantiate a new ClientBuilder
+      $client = \Elasticsearch\ClientBuilder::create()
+        ->setHosts($hosts)      // Set the hosts
+        ->build();
+      $results = $client->index($params);
     }
   }
   /*
