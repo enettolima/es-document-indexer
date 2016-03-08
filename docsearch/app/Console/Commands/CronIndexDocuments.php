@@ -56,9 +56,16 @@ class CronIndexDocuments extends Command
     //Test connection with db and print log
     //$this->dbTests();
 
+    $start = microtime(true);
+    $start_date = Date("y-m-d H:i:s");
     //Call the function to start the folder and file creation on ES
     $this->createFolderIndex();
     //Call the function to start the file indexing on ES
+    $time_elapsed_secs = microtime(true) - $start;
+
+    $end_date = Date("y-m-d H:i:s");
+	
+    $this->info('Script started at: '.$start_date." and finished at: ".$end_date." with total time of execution of ".$time_elapsed_secs." seconds.");
   }
   /*
    * Create index with all the folders on ES
