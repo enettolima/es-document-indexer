@@ -49,55 +49,14 @@ class CronIndexDocuments extends Command
    */
   public function handle()
   {
-    //$client = new Client();
-
-    //$data = array('key1' => 'value1', 'key2' => 'value2');
-
-    /*$data = array(
-      'channel' => "#app-notifications",
-      'username' => "Passport Document Indexer",
-      'text' => "Document Indexer failed to index the following files: \n Testing",
-      'icon_emoji' => ":turtle:"
-    );
-    //Requests::register_autoloader();
-    $response = Requests::post('https://hooks.slack.com/services/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', array(), json_encode($data));
-    var_dump($response->body);
-*/
-    /*$client = new GuzzleHttp\Client();
-    $res = $client->post('https://hooks.slack.com/services/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', [
-      'channel' => '#app-notifications',
-      'username' => 'Passport Document Indexer',
-      'text' => 'Document Indexer failed to index the following files:\nTesting',
-      'icon_emoji' => ':turtle:'
-    ]);*/
-    //echo $res->getStatusCode(); // 200
-    //echo $res->getBody(); // { "type": "User", ....
-    /*
-    $request = new Request('POST', 'https://hooks.slack.com/services/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');
-
-    $response = $client->send($request, [
-      'channel' => '#app-notifications',
-      'username' => 'Passport Document Indexer',
-      'text' => 'Document Indexer failed to index the following files:\nTesting',
-      'icon_emoji' => ':turtle:'
-    ]);*/
-
-    /*$response = $client->post('POST', 'https://hooks.slack.com/services/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', [
-      'channel' => '#app-notifications',
-      'username' => 'Passport Document Indexer',
-      'text' => 'Document Indexer failed to index the following files:\nTesting',
-      'icon_emoji' => ':turtle:'
-    ]);*/
-
     //Functions for test purposes only
     //$this->testElasticSearchConnection();
-    $this->clearMysqlTables();
+    //$this->clearMysqlTables();
     ////////////////////////////////
     //Clear Index and create maps again
-    $this->createIndex();
+    //$this->createIndex();
     //Test connection with db and print log
     //$this->dbTests();
-
     $start = microtime(true);
     $start_date = Date("y-m-d H:i:s");
     //Call the function to start the folder and file creation on ES
@@ -372,11 +331,11 @@ class CronIndexDocuments extends Command
     }else{
       //$arr['name']  = $name;
       //$arr['path']  = $filename;
-
-      $ct = count($this->invalid_files);
-
-      $this->invalid_files[$ct]['name']  = $name;
-      $this->invalid_files[$ct]['path'] 	= $filename;
+      if($name!="Thumbs.db" && $name!=".DS_Store" && $is_different){
+        $ct = count($this->invalid_files);
+        $this->invalid_files[$ct]['name']  = $name;
+        $this->invalid_files[$ct]['path'] 	= $filename;
+      }
     }
   }
   /*
@@ -480,6 +439,7 @@ else {
     //Only clearing folders table to make sure its always synced
     \App\Folder::truncate();
     \App\File::truncate();
+    \App\NotificationLog::truncate();
   }
   /*
    * Function to check if this file is good for us to read(in a vlid format)
@@ -618,36 +578,28 @@ else {
       Log::info("List of invalid files",$this->invalid_files);
       $SEL = "SELECT * FROM notification_logs WHERE last_log LIKE '$today%' LIMIT 1";
       $select = DB::connection('mysql')->select($SEL);
-      Log::info("Checking notification_logs table with result ",$select);
+      if(count($select)>0){
+        Log::info("Checking notification_logs table with result ",$select);
+        Log::info("inside if ".count($select));
+      }else{
+        $INS = "INSERT INTO notification_logs SET last_log = '$today_stamp'";
+        $insert = DB::connection('mysql')->update($INS);
+        //Log::info("Insert with result ",$insert);
+        //$this->invalid_files = array("\n", $array);
+        //$failed_files = implode("\n", $this->invalid_files);
+        $failed_files = "";
+        foreach ($this->invalid_files as $key => $value) {
+          $failed_files .= "Name: ".$this->invalid_files[$key]['name']."\nPath: ".$this->invalid_files[$key]['path']."\n-------------------------\n";
+        }
 
-      $INS = "INSERT INTO notification_logs SET last_log = '$today_stamp'";
-      $insert = DB::connection('mysql')->update($INS);
-      //Log::info("Insert with result ",$insert);
-      //$this->invalid_files = array("\n", $array);
-      //$failed_files = implode("\n", $this->invalid_files);
-      $failed_files = "";
-      foreach ($this->invalid_files as $key => $value) {
-        $failed_files .= "Name: ".$this->invalid_files[$key]['name']."\nPath: ".$this->invalid_files[$key]['path']."\n###################\n\n";
+        $data = array(
+          'channel' => "#app-notifications",
+          'username' => "Passport Document Indexer",
+          'text' => "Document Indexer failed to index the following files: \n ".$failed_files,
+          'icon_emoji' => ":turtle:"
+        );
+        $response = Requests::post($_ENV['slack_post_url'], array(), json_encode($data));
       }
-
-      /*$client = new Client();
-      $response = $client->request('POST', 'https://hooks.slack.com/services/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', [
-        'channel' => '#app-notifications',
-        'username' => 'Passport Document Indexer',
-        'text' => 'Document Indexer failed to index the following files:\n'.$failed_files,
-        'icon_emoji' => ':turtle:'
-      ]);*/
-
-
-      $data = array(
-        'channel' => "#app-notifications",
-        'username' => "Passport Document Indexer",
-        'text' => "Document Indexer failed to index the following files: \n ".$failed_files,
-        'icon_emoji' => ":turtle:"
-      );
-      //Requests::register_autoloader();
-      $response = Requests::post('https://hooks.slack.com/services/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', array(), json_encode($data));
-      //var_dump($response->body);
     }else{
       Log::info("No Invalid Files");
       $this->info("No Invalid Files");
