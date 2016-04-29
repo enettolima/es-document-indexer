@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Folder;
 use App\File;
+use App\Click;
 use Log;
 use DB;
 use Requests;
@@ -49,6 +50,7 @@ class CronIndexDocuments extends Command
    */
   public function handle()
   {
+
     //Functions for test purposes only
     //$this->testElasticSearchConnection();
     //$this->clearMysqlTables();
@@ -63,11 +65,9 @@ class CronIndexDocuments extends Command
     $this->createFolderIndex();
     //Call the function to start the file indexing on ES
     $time_elapsed_secs = microtime(true) - $start;
-
     $end_date = Date("y-m-d H:i:s");
 
     $this->info('Script started at: '.$start_date." and finished at: ".$end_date." with total time of execution of ".$time_elapsed_secs." seconds.");
-
   }
   /*
    * Create index with all the folders on ES
@@ -97,17 +97,12 @@ class CronIndexDocuments extends Command
       $this->removeMissingFiles();
     //}
     //Start slack notification
-    $this->sendSlackNotification();
+    //$this->sendSlackNotification();
   }
   /*
    * This function will loop through the directories and get all the folders and files
    */
   private function listFolderFiles($dir){
-    //$this->info('Folder: '.$dir);
-
-    $this->info('#################');
-    $this->info('Path: '.$dir);
-
     $children = false;
     $isRoot = false;
     if($dir==$_ENV['EBT_FILE_STORAGE']){
@@ -116,8 +111,8 @@ class CronIndexDocuments extends Command
 
     $folderName = $this->getFolderName($dir);
     if(!$isRoot){
-      $this->info('Directory Name: '.$folderName['child']);
-      $this->info('Parent Name: '.$folderName['parent']);
+      //$this->info('Directory Name: '.$folderName['child']);
+      //$this->info('Parent Name: '.$folderName['parent']);
     }
 
     //$this->info('Folder: '.$dir);
@@ -127,15 +122,35 @@ class CronIndexDocuments extends Command
         if ($fileInfo->isDir()) {
           $this->listFolderFiles($fileInfo->getPathname());
         }else{
+          $rename = false;
           $this->info('File: '.$fileInfo->getFilename());
-          $this->checkFileExtension($dir.'/'.$fileInfo->getFilename(), $fileInfo->getFilename(), $dir);
+          //$info = new SplFileInfo($dir.'/'.$fileInfo->getFilename());
+          $ext = ".".pathinfo($fileInfo->getFilename(), PATHINFO_EXTENSION);
+          //$ext = "."$info->getExtension();
+          $this->info('File: extension '.$ext);
+          $filebreak = str_replace($ext,"",$fileInfo->getFilename());
+          if (strpos($filebreak, '.') !== false || strpos($filebreak, "'") !== false) {
+            $rename = true;
+          }
+          if($rename){
+            $replace = array(".", "'");
+            $fileraw = str_replace($replace," ",$filebreak);
+            $this->info('File: raw '.$fileraw);
+            $newfilename = $fileraw . $ext;
+            $this->info('File: new '.$newfilename);
+            $prod_filename = $newfilename;
+            rename($dir.'/'.$fileInfo->getFilename(),$dir.'/'.$newfilename);
+          }else{
+            $prod_filename = $fileInfo->getFilename();
+          }
+          $this->checkFileExtension($dir.'/'.$prod_filename, $prod_filename, $dir);
         }
         $children = true;
       }else{
         $children = false;
       }
     }
-    $this->info('Children: '.$children);
+    //$this->info('Children: '.$children);
 
     if(!$isRoot){
       $this->folders[$this->count]['name'] 			= $folderName['child'];
@@ -144,7 +159,7 @@ class CronIndexDocuments extends Command
       $this->folders[$this->count]['children']	= $children;
       $this->count++;
     }
-    $this->info('#################');
+    //$this->info('#################');
   }
 
   /*
@@ -173,9 +188,9 @@ class CronIndexDocuments extends Command
       if(!$this->isFolderSaved($value)){
         //Create object on mysql table
         $folder               = new Folder;
-        $folder->name         = $value['name'];
-        $folder->parent       = $value['parent'];
-        $folder->full_path    = $value['full_path'];
+        $folder->name         = str_replace("'","\'",$value['name']);
+        $folder->parent       = str_replace("'","\'",$value['parent']);
+        $folder->full_path    = str_replace("'","\'",$value['full_path']);
         $folder->children     = $value['children'];
         $folder->found        = 1;
 
@@ -206,10 +221,12 @@ class CronIndexDocuments extends Command
   */
   private function isFolderSaved($data){
     //Checking the folder table to make sure we have the
-    $f = Folder::where('name', '=', $data['name'])->where('full_path', '=', $data['full_path'])->get();
+    //$f = Folder::where('name', '=', $data['name'])->where('full_path', '=', $data['full_path'])->get();
+    $SEL = "SELECT * FROM folders WHERE name='".$data['name']."' AND full_path='".$data['full_path']."'";
+    $f = DB::connection('mysql')->select($SEL);
     if(count($f) > 0){
       foreach ($f as $folder) {
-        $SQL = "UPDATE folders SET found = '1' WHERE id = '".$folder['id']."'";
+        $SQL = "UPDATE folders SET found = '1' WHERE id = '".$folder->id."'";
         DB::connection('mysql')->update($SQL);
       }
       return true;
@@ -231,11 +248,15 @@ class CronIndexDocuments extends Command
     $new_file     = true;
     $file_id      = 0;
     $is_different = true;
-    $f = File::where('name', '=', $name)->where('path', '=', $filename)->get();
+    //$f = File::where('name', '=', $name)->where('path', '=', $filename)->get();
+    $SEL = "SELECT * FROM files WHERE name='".$name."' AND path='".$filename."'";
+    $f = DB::connection('mysql')->select($SEL);
+    //Getting the amount of clicks
+
     if(count($f) > 0){
-      $file_id   = $f[0]['id'];
-      $this->info('File '.$name.' last update => '.$last_update.' - db last update '.$f[0]['last_file_change']);
-      if($f[0]['last_file_change'] != $last_update){
+      $file_id   = $f[0]->id;
+      $this->info('File '.$name.' last update => '.$last_update.' - db last update '.$f[0]->last_file_change);
+      if($f[0]->last_file_change != $last_update){
         $this->info('Different');
         //Updating files
         $SQL = "UPDATE files SET updated_at = '$index_time',
@@ -252,7 +273,7 @@ class CronIndexDocuments extends Command
       }
     }
     //If the date on the file has been changed, than re-index that file
-    $extension = $ext_arr[$m];
+    $extension = strtolower($ext_arr[$m]);
     if($is_different){
       switch ($extension) {
         case 'pdf':
@@ -291,11 +312,13 @@ class CronIndexDocuments extends Command
     }
 
     if($valid){
+
+      $created_now = false;
       if($file_id<1){
         //Create object on mysql table
         $file                   = new File;
-        $file->name             = $name;
-        $file->path             = $filename;
+        $file->name             = str_replace("'","\'",$name);
+        $file->path             = str_replace("'","\'",$filename);
         $file->extension        = $extension;
         $file->updated_at       = $index_time;
         $file->last_file_change = $last_update;
@@ -303,7 +326,10 @@ class CronIndexDocuments extends Command
         // save the folder to the database
         $file_db                = $file->save();
         $file_id                = $file->id;
+        $created_now            = true;
       }
+
+      $clicks = $this->checkClickCount($name, $filename, $file_id);
       //Creating the array for elasticsearch
       $body['name']       = $name;
       $body['parent']     = $parent;
@@ -311,24 +337,21 @@ class CronIndexDocuments extends Command
       $body['extension']  = $extension;
       $body['updated_at'] = $last_update;
       $body['index_stamp']= $index_time;
+      $body['clicks']     = $clicks;
       $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);
 
       $this->info('Mysql ID for file '.$body['name'].' -> '.$file_id);
-
-      $params = [
-          'index' => 'docsearch',
-          'type' => 'files',
-          'id'  => $file_id,
-          'body' => $body
-      ];
-
-      $hosts = [$_ENV['ES_HOST']];// IP + Port
-      // Instantiate a new ClientBuilder
-      $client = \Elasticsearch\ClientBuilder::create()
-        ->setHosts($hosts)      // Set the hosts
-        ->build();
-      $results = $client->index($params);
+      if($created_now){
+        //Sending to Elasticsearch
+        $this->createDocument($file_id, $body);
+      }
+      Log::info("Indexing file ".$file_id." - ".$name);
     }else{
+      $clicks = $this->checkClickCount($name, $filename, $file_id);
+      if($file_id>0 && $clicks>0){
+        //Sending to Elasticsearch
+        $this->updateClicks($file_id, $clicks);
+      }
       //$arr['name']  = $name;
       //$arr['path']  = $filename;
       if($name!="Thumbs.db" && $name!=".DS_Store" && $is_different){
@@ -338,6 +361,34 @@ class CronIndexDocuments extends Command
       }
     }
   }
+
+  /*
+   * Check if file exists on clicks table and returns the click count
+   */
+  private function checkClickCount($name, $path, $file_id){
+    //$c = Click::where('name', '=', $name)->where('path', '=', $path)->get();
+    $SEL = "SELECT * FROM clicks WHERE name='".$name."' AND path='".$path."'";
+    $c = DB::connection('mysql')->select($SEL);
+    if(count($c) > 0){
+      $clicks   = $c[0]->clicks;
+      if($file_id!=$c[0]->file_id){
+        $UP = "UPDATE clicks SET file_id='".$file_id."' WHERE name='".$name."' AND path='".$path."'";
+        $update = DB::connection('mysql')->update($UP);
+      }
+    }else{
+      //Create object on mysql table
+      $click          = new Click;
+      $click->name    = $name;
+      $click->path    = $path;
+      $click->file_id = $file_id;
+      $click->clicks  = 0;
+      // save the clicks to the database
+      $file_db        = $click->save();
+      $clicks         = 0;
+    }
+    return $clicks;
+  }
+
   /*
    * Only to see if the cache file exists and set the global variable
    */
@@ -474,30 +525,20 @@ else {
   */
   private function createIndex(){
     $hosts = [$_ENV['ES_HOST']];// IP + Port
-    //Deleting docsearch index
     $client = \Elasticsearch\ClientBuilder::create()           // Instantiate a new ClientBuilder
     ->setHosts($hosts)      // Set the hosts
     ->build();
-    $deleteParams = ['index' => 'docsearch'];
-    $response = $client->indices()->delete($deleteParams);
 
+    //Checking if index exists
+    $request = Requests::get('http://'.$_ENV['ES_HOST'].'/docsearch', array('Accept' => 'application/json'));
+    //If index exists(!=404) then delete it and try to create again
+    if($request->status_code!=404){
+      $this->info('################# Index Already Exists - Deleting now #################');
+      //Deleting docsearch index
+      $deleteParams = ['index' => 'docsearch'];
+      $response = $client->indices()->delete($deleteParams);
+    }
     //Creating map
-    /*
-    "mappings": {
-            "folders": {
-                "properties": {
-                    "full_path": {
-                        "type":  "string",
-                        "index": "not_analyzed"
-                    },
-                    "parent": {
-                        "type":  "string",
-                        "index": "not_analyzed"
-                    }
-                }
-            }
-        }
-    */
     $params = [
       'index' => 'docsearch',
       'body' => [
@@ -523,6 +564,49 @@ else {
     //$this->info('response is ',$response);
     Log::info("Creating index ->>> ", $response);
     $this->info('##################################');
+  }
+
+  /*
+  * Function to create the document index
+  */
+  private function createDocument($file_id, $body){
+    $params = [
+        'index' => 'docsearch',
+        'type' => 'files',
+        'id'  => $file_id,
+        'body' => $body
+    ];
+
+    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    // Instantiate a new ClientBuilder
+    $client = \Elasticsearch\ClientBuilder::create()
+      ->setHosts($hosts)      // Set the hosts
+      ->build();
+    $client->index($params);
+  }
+
+  /*
+  * Function to update the document clicks
+  */
+  private function updateClicks($file_id, $clicks){
+    $params = [
+        'index' => 'docsearch',
+        'type' => 'files',
+        'id'  => $file_id,
+        'body' => [
+          'doc' => [
+            'clicks' => $clicks
+          ]
+        ]
+    ];
+
+    Log::info("PARAMS",$params);
+    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    // Instantiate a new ClientBuilder
+    $client = \Elasticsearch\ClientBuilder::create()
+      ->setHosts($hosts)      // Set the hosts
+      ->build();
+    $client->update($params);
   }
 
   private function dbTests(){
