@@ -3,7 +3,7 @@
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
-class CreateNotificationLog extends Migration
+class CreateClicksTable extends Migration
 {
     /**
      * Run the migrations.
@@ -12,10 +12,13 @@ class CreateNotificationLog extends Migration
      */
     public function up()
     {
-      //Script will check this table to make sure we sent notification to slack
-      Schema::create('notification_logs', function (Blueprint $table) {
+      //Script will check this table to count clicks
+      Schema::create('clicks', function (Blueprint $table) {
           $table->increments('id');
-          $table->timestamp('last_log')->nullable();
+          $table->string('name', 100);
+          $table->string('path', 200);
+          $table->integer('clicks', 0);
+          $table->integer('file_id', 0);
           $table->timestamps();
       });
     }
@@ -27,6 +30,6 @@ class CreateNotificationLog extends Migration
      */
     public function down()
     {
-        Schema::drop('notification_logs');
+        Schema::dropIfExists('clicks');
     }
 }
