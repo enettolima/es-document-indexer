@@ -71,10 +71,10 @@ cd /usr/share/elasticsearch
 
 ./bin/plugin install marvel-agent
 
-printf "${NC}Installing maven3\n"
-sudo apt-add-repository ppa:andrei-pozolotin/maven3
-sudo apt-get update
-sudo apt-get install maven3
+#printf "${NC}Installing maven3\n"
+#sudo apt-add-repository ppa:andrei-pozolotin/maven3
+#sudo apt-get update
+#sudo apt-get install maven3
 
 printf "${NC}Installing Kibana4.4.0\n"
 cd /etc/elasticsearch
@@ -84,6 +84,8 @@ sudo chmod -R 777 kibana
 cd kibana
 
 bin/kibana plugin --install elasticsearch/marvel/latest
+
+/bin/kibana plugin --install elastic/sense
 
 sudo service elasticsearch restart
 
