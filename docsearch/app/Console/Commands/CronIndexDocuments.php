@@ -41,6 +41,9 @@ class CronIndexDocuments extends Command
   public function __construct()
   {
       parent::__construct();
+      $this->file_storage = "/media/web";
+      $this->es_host = "es.earthboundtrading.com:9200";
+      $this->slack_url = "https://hooks.slack.com/services/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";
   }
 
   /**
@@ -74,7 +77,7 @@ class CronIndexDocuments extends Command
    */
   private function createFolderIndex(){
     //Just testing the command
-    $this->info('Starting to search the folder: '.$_ENV['EBT_FILE_STORAGE']);
+    $this->info('Starting to search the folder: '.$this->file_storage);
     $this->folders = array();
     $this->invalid_files = array();
     $this->count = 0;
@@ -88,7 +91,7 @@ class CronIndexDocuments extends Command
     //Checking if cache file exist, if not just create all the index on ES
     $this->checkCacheFolder();
     //Loop through the directories to get files ad folders
-    $this->listFolderFiles($_ENV['EBT_FILE_STORAGE']);
+    $this->listFolderFiles($this->file_storage);//$_ENV['EBT_FILE_STORAGE']);
     //Check if any folder is missing from cache and try to create on ES
     $this->compareCacheFolders();
 
@@ -97,7 +100,7 @@ class CronIndexDocuments extends Command
       $this->removeMissingFiles();
     //}
     //Start slack notification
-    //$this->sendSlackNotification();
+    $this->sendSlackNotification();
   }
   /*
    * This function will loop through the directories and get all the folders and files
@@ -105,7 +108,7 @@ class CronIndexDocuments extends Command
   private function listFolderFiles($dir){
     $children = false;
     $isRoot = false;
-    if($dir==$_ENV['EBT_FILE_STORAGE']){
+    if($dir==$this->file_storage){
       $isRoot = true;
     }
 
@@ -204,7 +207,7 @@ class CronIndexDocuments extends Command
             'body' => $value
         ];
         $this->info('Mysql ID for folder '.$value['name'].' -> '.$folder->id);
-        $hosts = [$_ENV['ES_HOST']];// IP + Port
+        $hosts = [$this->es_host];// IP + Port
         // Instantiate a new ClientBuilder
         $client = \Elasticsearch\ClientBuilder::create()
           ->setHosts($hosts)      // Set the hosts
@@ -507,7 +510,7 @@ else {
         'type' => 'folders',
         'body' => $value
     ];
-    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    $hosts = [$this->es_host];// IP + Port
 
     $client = \Elasticsearch\ClientBuilder::create()           // Instantiate a new ClientBuilder
                         ->setHosts($hosts)      // Set the hosts
@@ -524,13 +527,13 @@ else {
   * Function to delete index and re-create the maps
   */
   private function createIndex(){
-    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    $hosts = [$this->es_host];// IP + Port
     $client = \Elasticsearch\ClientBuilder::create()           // Instantiate a new ClientBuilder
     ->setHosts($hosts)      // Set the hosts
     ->build();
 
     //Checking if index exists
-    $request = Requests::get('http://'.$_ENV['ES_HOST'].'/docsearch', array('Accept' => 'application/json'));
+    $request = Requests::get('http://'.$this->es_host.'/docsearch', array('Accept' => 'application/json'));
     //If index exists(!=404) then delete it and try to create again
     if($request->status_code!=404){
       $this->info('################# Index Already Exists - Deleting now #################');
@@ -577,7 +580,7 @@ else {
         'body' => $body
     ];
 
-    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    $hosts = [$this->es_host];// IP + Port
     // Instantiate a new ClientBuilder
     $client = \Elasticsearch\ClientBuilder::create()
       ->setHosts($hosts)      // Set the hosts
@@ -601,7 +604,7 @@ else {
     ];
 
     Log::info("PARAMS",$params);
-    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    $hosts = [$this->es_host];// IP + Port
     // Instantiate a new ClientBuilder
     $client = \Elasticsearch\ClientBuilder::create()
       ->setHosts($hosts)      // Set the hosts
@@ -620,7 +623,7 @@ else {
   }
 
   private function removeMissingFiles(){
-    $hosts = [$_ENV['ES_HOST']];// IP + Port
+    $hosts = [$this->es_host];// IP + Port
     //Deleting docsearch index
     $client = \Elasticsearch\ClientBuilder::create()           // Instantiate a new ClientBuilder
     ->setHosts($hosts)      // Set the hosts
@@ -682,7 +685,7 @@ else {
           'text' => "Document Indexer failed to index the following files: \n ".$failed_files,
           'icon_emoji' => ":turtle:"
         );
-        $response = Requests::post($_ENV['slack_post_url'], array(), json_encode($data));
+        $response = Requests::post($this->slack_url, array(), json_encode($data));
       }
     }else{
       Log::info("No Invalid Files");
