@@ -14,7 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         // Commands\Inspire::class,
-        Commands\CronIndexDocuments::class
+        \App\Console\Commands\CronIndexDocuments::class
     ];
 
     /**
@@ -27,5 +27,7 @@ class Kernel extends ConsoleKernel
     {
         // $schedule->command('inspire')
         //          ->hourly();
+	//$schedule->command('test:cron')->everyMinute();
+	$schedule->command('cron:index-documents')->everyFiveMinutes();
     }
 }
