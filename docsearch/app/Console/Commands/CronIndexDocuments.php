@@ -53,7 +53,6 @@ class CronIndexDocuments extends Command
    */
   public function handle()
   {
-
     //Functions for test purposes only
     //$this->testElasticSearchConnection();
     //$this->clearMysqlTables();
@@ -65,6 +64,8 @@ class CronIndexDocuments extends Command
     $start = microtime(true);
     $start_date = Date("y-m-d H:i:s");
     //Call the function to start the folder and file creation on ES
+    Log::info("Script Started now -> ".$start);
+    Log::info("Processing..");
     $this->createFolderIndex();
     //Call the function to start the file indexing on ES
     $time_elapsed_secs = microtime(true) - $start;
@@ -134,11 +135,11 @@ class CronIndexDocuments extends Command
           //$ext = "."$info->getExtension();
           //$this->info('File: extension '.$ext);
           $filebreak = str_replace($ext,"",$fileInfo->getFilename());
-          if (strpos($filebreak, '.') !== false || strpos($filebreak, "'") !== false) {
+          if (strpos($filebreak, '.') !== false || strpos($filebreak, "'") !== false || strpos($filebreak, "#") !== false) {
             $rename = true;
           }
           if($rename){
-            $replace = array(".", "'");
+            $replace = array(".", "'", "#");
             $fileraw = str_replace($replace," ",$filebreak);
             //$this->info('File: raw '.$fileraw);
             $newfilename = $fileraw . $ext;
