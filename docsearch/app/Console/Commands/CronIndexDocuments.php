@@ -70,14 +70,16 @@ class CronIndexDocuments extends Command
     $time_elapsed_secs = microtime(true) - $start;
     $end_date = Date("y-m-d H:i:s");
 
-    $this->info('Script started at: '.$start_date." and finished at: ".$end_date." with total time of execution of ".$time_elapsed_secs." seconds.");
+    $message = "Script started at: ".$start_date." and finished at: ".$end_date." with total time of execution of ".$time_elapsed_secs." seconds.";
+    $this->info($message);
+    Log::info($message);
   }
   /*
    * Create index with all the folders on ES
    */
   private function createFolderIndex(){
     //Just testing the command
-    $this->info('Starting to search the folder: '.$this->file_storage);
+    //$this->info('Starting to search the folder: '.$this->file_storage);
     $this->folders = array();
     $this->invalid_files = array();
     $this->count = 0;
@@ -126,11 +128,11 @@ class CronIndexDocuments extends Command
           $this->listFolderFiles($fileInfo->getPathname());
         }else{
           $rename = false;
-          $this->info('File: '.$fileInfo->getFilename());
+          //$this->info('File: '.$fileInfo->getFilename());
           //$info = new SplFileInfo($dir.'/'.$fileInfo->getFilename());
           $ext = ".".pathinfo($fileInfo->getFilename(), PATHINFO_EXTENSION);
           //$ext = "."$info->getExtension();
-          $this->info('File: extension '.$ext);
+          //$this->info('File: extension '.$ext);
           $filebreak = str_replace($ext,"",$fileInfo->getFilename());
           if (strpos($filebreak, '.') !== false || strpos($filebreak, "'") !== false) {
             $rename = true;
@@ -138,9 +140,9 @@ class CronIndexDocuments extends Command
           if($rename){
             $replace = array(".", "'");
             $fileraw = str_replace($replace," ",$filebreak);
-            $this->info('File: raw '.$fileraw);
+            //$this->info('File: raw '.$fileraw);
             $newfilename = $fileraw . $ext;
-            $this->info('File: new '.$newfilename);
+            //$this->info('File: new '.$newfilename);
             $prod_filename = $newfilename;
             rename($dir.'/'.$fileInfo->getFilename(),$dir.'/'.$newfilename);
           }else{
@@ -182,7 +184,7 @@ class CronIndexDocuments extends Command
    * Function to compare what the folders are now against the cache file
    */
   private function compareCacheFolders(){
-    $this->info('List of folders');
+    //$this->info('List of folders');
     $headers = ['Name', 'Parent', 'full_path', 'children'];
     $this->table($headers, $this->folders);
 
@@ -206,7 +208,7 @@ class CronIndexDocuments extends Command
             'id'  => $folder->id,
             'body' => $value
         ];
-        $this->info('Mysql ID for folder '.$value['name'].' -> '.$folder->id);
+        //$this->info('Mysql ID for folder '.$value['name'].' -> '.$folder->id);
         $hosts = [$this->es_host];// IP + Port
         // Instantiate a new ClientBuilder
         $client = \Elasticsearch\ClientBuilder::create()
@@ -258,21 +260,21 @@ class CronIndexDocuments extends Command
 
     if(count($f) > 0){
       $file_id   = $f[0]->id;
-      $this->info('File '.$name.' last update => '.$last_update.' - db last update '.$f[0]->last_file_change);
+      //$this->info('File '.$name.' last update => '.$last_update.' - db last update '.$f[0]->last_file_change);
       if($f[0]->last_file_change != $last_update){
-        $this->info('Different');
+        //$this->info('Different');
         //Updating files
         $SQL = "UPDATE files SET updated_at = '$index_time',
         last_file_change = '$last_update',
         found = '1' WHERE id = '$file_id'";
         $update = DB::connection('mysql')->update($SQL);
-        Log::info("Update Query -> ".$SQL." with result ".$update);
+        //Log::info("Update Query -> ".$SQL." with result ".$update);
       }else{
         $is_different  = false;
         $new_file      = false;
         $SQL = "UPDATE files SET found = '1' WHERE id = '$file_id'";
         $update = DB::connection('mysql')->update($SQL);
-        $this->info('Is the same');
+        //$this->info('Is the same');
       }
     }
     //If the date on the file has been changed, than re-index that file
@@ -343,12 +345,12 @@ class CronIndexDocuments extends Command
       $body['clicks']     = $clicks;
       $body['content']    = preg_replace('/[^A-Za-z0-9\. -]/', '', $content);
 
-      $this->info('Mysql ID for file '.$body['name'].' -> '.$file_id);
+      //$this->info('Mysql ID for file '.$body['name'].' -> '.$file_id);
       if($created_now){
         //Sending to Elasticsearch
         $this->createDocument($file_id, $body);
       }
-      Log::info("Indexing file ".$file_id." - ".$name);
+      //Log::info("Indexing file ".$file_id." - ".$name);
     }else{
       $clicks = $this->checkClickCount($name, $filename, $file_id);
       if($file_id>0 && $clicks>0){
@@ -517,10 +519,10 @@ else {
                         ->build();
     $results = $client->create($params);
 
-    $this->info('#################Connection with ES#################');
+   // $this->info('#################Connection with ES#################');
 
-    $this->info('response is '.$results);
-    $this->info('##################################');
+    //$this->info('response is '.$results);
+    //$this->info('##################################');
   }
 
   /*
@@ -536,7 +538,7 @@ else {
     $request = Requests::get('http://'.$this->es_host.'/docsearch', array('Accept' => 'application/json'));
     //If index exists(!=404) then delete it and try to create again
     if($request->status_code!=404){
-      $this->info('################# Index Already Exists - Deleting now #################');
+      //$this->info('################# Index Already Exists - Deleting now #################');
       //Deleting docsearch index
       $deleteParams = ['index' => 'docsearch'];
       $response = $client->indices()->delete($deleteParams);
@@ -563,10 +565,10 @@ else {
     ];
 
     $response = $client->indices()->create($params);
-    $this->info('#################Creating Index with ES#################');
+    //$this->info('#################Creating Index with ES#################');
     //$this->info('response is ',$response);
-    Log::info("Creating index ->>> ", $response);
-    $this->info('##################################');
+    //Log::info("Creating index ->>> ", $response);
+    //$this->info('##################################');
   }
 
   /*
@@ -603,7 +605,7 @@ else {
         ]
     ];
 
-    Log::info("PARAMS",$params);
+    //Log::info("PARAMS",$params);
     $hosts = [$this->es_host];// IP + Port
     // Instantiate a new ClientBuilder
     $client = \Elasticsearch\ClientBuilder::create()
@@ -614,10 +616,10 @@ else {
 
   private function dbTests(){
     //$this->info('Testing Log');
-    Log::info("Logging something!");
+    //Log::info("Logging something!");
     $f = Folder::where('name', '=', 'Android')->where('full_path', '=', '/var/www/es_docs/Guides/Development/Android')->get();
     foreach ($f as $folder) {
-      Log::info("Folder name ".$folder['name']." path ".$folder['full_path']." id= ".$folder['id']);
+      //Log::info("Folder name ".$folder['name']." path ".$folder['full_path']." id= ".$folder['id']);
     }
     //$this->info('Done');
   }
@@ -662,12 +664,12 @@ else {
     $today_stamp = date('Y-m-d H:i:s');
 
     if(count($this->invalid_files)>0){
-      Log::info("List of invalid files",$this->invalid_files);
+      //Log::info("List of invalid files",$this->invalid_files);
       $SEL = "SELECT * FROM notification_logs WHERE last_log LIKE '$today%' LIMIT 1";
       $select = DB::connection('mysql')->select($SEL);
       if(count($select)>0){
-        Log::info("Checking notification_logs table with result ",$select);
-        Log::info("inside if ".count($select));
+        //Log::info("Checking notification_logs table with result ",$select);
+        //Log::info("inside if ".count($select));
       }else{
         $INS = "INSERT INTO notification_logs SET last_log = '$today_stamp'";
         $insert = DB::connection('mysql')->update($INS);
@@ -688,7 +690,7 @@ else {
         $response = Requests::post($this->slack_url, array(), json_encode($data));
       }
     }else{
-      Log::info("No Invalid Files");
+      //Log::info("No Invalid Files");
       $this->info("No Invalid Files");
     }
   }
