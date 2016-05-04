@@ -15,6 +15,9 @@ Vagrant.configure("2") do |config|
 	config.vm.network :forwarded_port, guest: 5601, host: 5601
 	config.vm.network :forwarded_port, guest: 9200, host: 9300
 
-  config.vm.synced_folder ".", "/var/www", owner: "www-data", group: "www-data"
+  config.vm.synced_folder ".", "/var/www",
+		owner: "vagrant",
+		group: "www-data",
+		mount_options: ["dmode=775,fmode=664"]
   config.vm.hostname = "dev.elasticsearch.com"
 end

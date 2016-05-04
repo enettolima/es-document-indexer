@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 #Creating required folder(s)
 printf "${NC}Creating directory\n"
 mkdir -p /var/www
-chmod -R 755 /var/www
+sudo chmod -R 777 /var/www
 printf "${NC}Updating Ubuntu\n"
 sudo add-apt-repository ppa:webupd8team/java
 apt-get -y update
@@ -25,11 +25,13 @@ apt-get -y install nginx php-pear php5-dev php5-fpm build-essential unzip libaio
 php5enmod mcrypt
 #
 #Installing Mysql
+printf "${NC}Installing Mysql\n"
 debconf-set-selections <<< 'mysql-server mysql-server/root_password password 123456'
 debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password 123456'
 apt-get -y install mysql-server
 sed -i s/\;cgi\.fix_pathinfo\s*\=\s*1/cgi.fix_pathinfo\=0/ /etc/php5/fpm/php.ini
 service php5-fpm restart
+
 #
 #Setting up nginx
 mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
@@ -37,14 +39,25 @@ cp /var/www/project_resources/vagrant/default.site /etc/nginx/sites-available/de
 #
 #Custom stuff
 sudo chmod -R 777 /var/www/docsearch
-cp /var/www/project_resources/env.local.php /var/www/docsearch/.env.local.php
+cp /var/www/project_resources/env.local.php /var/www/docsearch/.env
+
 #mysql -p123456 -u root < /var/www/project_resources/database/install.sql
-cd /home/vagrant
-curl -sS https://getcomposer.org/installer | php
-mv composer.phar /usr/local/bin/composer
+printf "${NC}Installing Composer\n"
 cd /var/www/docsearch
-composer clearcache
-composer update -n -o -vvv
+php -r "readfile('https://getcomposer.org/installer');" > composer-setup.php
+php -r "if (hash_file('SHA384', 'composer-setup.php') === 'a52be7b8724e47499b039d53415953cc3d5b459b9d9c0308301f867921c19efc623b81dfef8fc2be194a5cf56945d223') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+php composer-setup.php
+php -r "unlink('composer-setup.php');"
+php composer.phar clearcache
+php composer.phar install --no-scripts
+php composer.phar update -n -o -vvv
+
+printf "${NC}Creating database\n"
+mysql -p123456 -u root < /var/www/project_resources/vagrant/create_db.sql
+cd /var/www/docsearch
+printf "${NC}Migrating tables\n"
+php artisan migrate
+
 
 #Installing java
 printf "${NC}Installing java\n"
@@ -67,9 +80,8 @@ cp /var/www/project_resources/elasticsearch-2.2.0/config/elasticsearch.yml /etc/
 
 sudo chmod -R 777 /usr/share/elasticsearch
 cd /usr/share/elasticsearch
-./bin/plugin install license
-
-./bin/plugin install marvel-agent
+/bin/plugin install license
+/bin/plugin install marvel-agent
 
 #printf "${NC}Installing maven3\n"
 #sudo apt-add-repository ppa:andrei-pozolotin/maven3
@@ -83,11 +95,9 @@ cp -r /var/www/project_resources/kibana-4.4.0-linux-x64/* kibana/
 sudo chmod -R 777 kibana
 cd kibana
 
-bin/kibana plugin --install elasticsearch/marvel/latest
+bin/kibana plugin --install elasticsearch/marvel/2.2.1
 
-/bin/kibana plugin --install elastic/sense
-
-sudo service elasticsearch restart
+bin/kibana plugin --install elastic/sense
 
 printf "${NC}Running ElasticSearch\n"
 sudo service elasticsearch restart

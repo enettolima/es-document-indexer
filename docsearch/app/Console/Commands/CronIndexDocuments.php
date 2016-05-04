@@ -41,9 +41,8 @@ class CronIndexDocuments extends Command
   public function __construct()
   {
       parent::__construct();
-      $this->file_storage = "/media/web";
-      $this->es_host = "es.earthboundtrading.com:9200";
-      $this->slack_url = "https://hooks.slack.com/services/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";
+      $this->file_storage = "/var/www/es_docs";
+      $this->es_host = "localhost:9200";
   }
 
   /**
@@ -53,6 +52,10 @@ class CronIndexDocuments extends Command
    */
   public function handle()
   {
+    $start_date = Date("y-m-d H:i:s");
+    $start = microtime(true);
+    $this->info("Script Started now -> ".$start_date);
+    $this->info("Processing..");
     //Functions for test purposes only
     //$this->testElasticSearchConnection();
     //$this->clearMysqlTables();
@@ -61,11 +64,8 @@ class CronIndexDocuments extends Command
     //$this->createIndex();
     //Test connection with db and print log
     //$this->dbTests();
-    $start = microtime(true);
-    $start_date = Date("y-m-d H:i:s");
+
     //Call the function to start the folder and file creation on ES
-    Log::info("Script Started now -> ".$start);
-    Log::info("Processing..");
     $this->createFolderIndex();
     //Call the function to start the file indexing on ES
     $time_elapsed_secs = microtime(true) - $start;
@@ -102,8 +102,6 @@ class CronIndexDocuments extends Command
     //if ($this->confirm('Do you wish to remove missing files? [y|N]')) {
       $this->removeMissingFiles();
     //}
-    //Start slack notification
-    $this->sendSlackNotification();
   }
   /*
    * This function will loop through the directories and get all the folders and files
@@ -658,41 +656,5 @@ else {
 
     $SQL = "DELETE FROM folders WHERE found = '0'";
     DB::connection('mysql')->update($SQL);
-  }
-
-  private function sendSlackNotification(){
-    $today = date('Y-m-d');
-    $today_stamp = date('Y-m-d H:i:s');
-
-    if(count($this->invalid_files)>0){
-      //Log::info("List of invalid files",$this->invalid_files);
-      $SEL = "SELECT * FROM notification_logs WHERE last_log LIKE '$today%' LIMIT 1";
-      $select = DB::connection('mysql')->select($SEL);
-      if(count($select)>0){
-        //Log::info("Checking notification_logs table with result ",$select);
-        //Log::info("inside if ".count($select));
-      }else{
-        $INS = "INSERT INTO notification_logs SET last_log = '$today_stamp'";
-        $insert = DB::connection('mysql')->update($INS);
-        //Log::info("Insert with result ",$insert);
-        //$this->invalid_files = array("\n", $array);
-        //$failed_files = implode("\n", $this->invalid_files);
-        $failed_files = "";
-        foreach ($this->invalid_files as $key => $value) {
-          $failed_files .= "Name: ".$this->invalid_files[$key]['name']."\nPath: ".$this->invalid_files[$key]['path']."\n-------------------------\n";
-        }
-
-        $data = array(
-          'channel' => "#app-notifications",
-          'username' => "Passport Document Indexer",
-          'text' => "Document Indexer failed to index the following files: \n ".$failed_files,
-          'icon_emoji' => ":turtle:"
-        );
-        $response = Requests::post($this->slack_url, array(), json_encode($data));
-      }
-    }else{
-      //Log::info("No Invalid Files");
-      $this->info("No Invalid Files");
-    }
   }
 }

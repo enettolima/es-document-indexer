@@ -1,26 +1,27 @@
-<?php
-/**
- * This should be copied to a dotfile like .env.cdev.php, where 'cdev' is the
- * name of the environment (see bootstrap/start.php for environments)
- *
- * This file should be updated anytime something needs to be added to the local
- * env file.
- */
-return array(
-    'envtype' => 'dev',
-    'url' => 'http://cdev.api.earthboundtrading.com',
-    'rpro_dbhost' => '',
-    'rpro_dbport' => '',
-    'rpro_dbname' => '',
-    'rpro_dbuser' => '',
-    'rpro_dbpass' => '',
-    'mysql_dbuser' => '',
-    'mysql_dbpass' => '',
-    'mysql_dbname' => '',
-    'mysql_dbhost' => '',
-    'sqlsrv_ebtgoogle_host'      => '',
-    'sqlsrv_ebtgoogle_database'  => '',
-    'sqlsrv_ebtgoogle_username'  => '',
-    'sqlsrv_ebtgoogle_password'  => ''
-);
+APP_ENV=local
+APP_DEBUG=true
+APP_KEY=0jPkG1AXVIM5bNnQyKNrENUWkK9Jcn43
 
+DB_HOST=127.0.0.1
+DB_DATABASE=docsearch
+DB_USERNAME=root
+DB_PASSWORD=123456
+
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+QUEUE_DRIVER=sync
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_DRIVER=smtp
+MAIL_HOST=mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+
+ES_HOST=dev.elasticsearch.com:9200
+
+EBT_FILE_STORAGE=/var/www/es_docs
