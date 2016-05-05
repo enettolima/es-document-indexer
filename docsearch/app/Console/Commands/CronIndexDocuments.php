@@ -137,7 +137,8 @@ class CronIndexDocuments extends Command
             $rename = true;
           }
           if($rename){
-            $replace = array(".", "'", "#");
+            $replace = array(".", "'", "#", ";", "/", "?", ":", "@", "=", "&", ",");
+            //“;”, “/”, “?”, “:”, “@”, “=” and “&
             $fileraw = str_replace($replace," ",$filebreak);
             //$this->info('File: raw '.$fileraw);
             $newfilename = $fileraw . $ext;

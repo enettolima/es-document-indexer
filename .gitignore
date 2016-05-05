@@ -2,3 +2,4 @@
 .*.swp
 oradiag_www-data/*
 html/*
+composer.lock
